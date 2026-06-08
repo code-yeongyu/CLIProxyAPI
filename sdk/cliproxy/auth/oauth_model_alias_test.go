@@ -107,6 +107,15 @@ func TestResolveOAuthUpstreamModel_SuffixPreservation(t *testing.T) {
 			want:    "",
 		},
 		{
+			name: "codex spark client alias",
+			aliases: map[string][]internalconfig.OAuthModelAlias{
+				"codex": {{Name: "gpt-5.3-codex-spark", Alias: "gpt-5.3-spark"}},
+			},
+			channel: "codex",
+			input:   "gpt-5.3-spark",
+			want:    "gpt-5.3-codex-spark",
+		},
+		{
 			name: "empty suffix filtered out",
 			aliases: map[string][]internalconfig.OAuthModelAlias{
 				"gemini-cli": {{Name: "gemini-2.5-pro-exp-03-25", Alias: "gemini-2.5-pro"}},

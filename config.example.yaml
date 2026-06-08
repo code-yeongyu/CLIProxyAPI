@@ -353,6 +353,9 @@ nonstream-keepalive-interval: 0
 #   codex:
 #     - name: "gpt-5"
 #       alias: "g5"
+#     - name: "gpt-5.3-codex-spark"
+#       alias: "gpt-5.3-spark"
+#       fork: true
 #   kimi:
 #     - name: "kimi-k2.5"
 #       alias: "k2.5"
