@@ -116,3 +116,47 @@ func TestEnsureImageGenerationTool_FreeCodexAuthDoesNotInjectTool(t *testing.T) 
 		t.Fatalf("expected no tools for free codex auth, got %s", gjson.GetBytes(result, "tools").Raw)
 	}
 }
+
+func TestEnsureImageGenerationTool_SparkStripsClientImageGenerationTool(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.3-codex-spark","tools":[{"type":"image_generation","output_format":"png"},{"type":"function","name":"shell","parameters":{}}]}`)
+	result := ensureImageGenerationTool(body, "gpt-5.3-codex-spark", nil)
+
+	tools := gjson.GetBytes(result, "tools")
+	arr := tools.Array()
+	if len(arr) != 1 {
+		t.Fatalf("expected 1 tool after stripping image_generation, got %d: %s", len(arr), tools.Raw)
+	}
+	if arr[0].Get("type").String() != "function" {
+		t.Fatalf("expected surviving tool type=function, got %s", arr[0].Get("type").String())
+	}
+}
+
+func TestEnsureImageGenerationTool_SparkStripsImageGenerationToolChoice(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.3-codex-spark","tools":[{"type":"image_generation"}],"tool_choice":{"type":"image_generation"}}`)
+	result := ensureImageGenerationTool(body, "gpt-5.3-codex-spark", nil)
+
+	if gjson.GetBytes(result, "tool_choice").Exists() {
+		t.Fatalf("expected tool_choice removed, got %s", gjson.GetBytes(result, "tool_choice").Raw)
+	}
+	if len(gjson.GetBytes(result, "tools").Array()) != 0 {
+		t.Fatalf("expected empty tools after stripping, got %s", gjson.GetBytes(result, "tools").Raw)
+	}
+}
+
+func TestEnsureImageGenerationTool_FreePlanStripsClientImageGenerationTool(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"},{"type":"web_search"}]}`)
+	freeAuth := &cliproxyauth.Auth{
+		Provider:   "codex",
+		Attributes: map[string]string{"plan_type": "free"},
+	}
+	result := ensureImageGenerationTool(body, "gpt-5.4", freeAuth)
+
+	tools := gjson.GetBytes(result, "tools")
+	arr := tools.Array()
+	if len(arr) != 1 {
+		t.Fatalf("expected 1 tool after stripping image_generation, got %d: %s", len(arr), tools.Raw)
+	}
+	if arr[0].Get("type").String() != "web_search" {
+		t.Fatalf("expected surviving tool type=web_search, got %s", arr[0].Get("type").String())
+	}
+}

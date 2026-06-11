@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1715,11 +1716,10 @@ func isCodexFreePlanAuth(auth *cliproxyauth.Auth) bool {
 }
 
 func ensureImageGenerationTool(body []byte, baseModel string, auth *cliproxyauth.Auth) []byte {
-	if strings.HasSuffix(baseModel, "spark") {
-		return body
-	}
-	if isCodexFreePlanAuth(auth) {
-		return body
+	// Spark models and free-plan codex accounts reject the image_generation tool upstream,
+	// so client-sent copies must be stripped instead of merely skipping injection.
+	if strings.HasSuffix(baseModel, "spark") || isCodexFreePlanAuth(auth) {
+		return stripImageGenerationTool(body)
 	}
 
 	tools := gjson.GetBytes(body, "tools")
@@ -1734,6 +1734,30 @@ func ensureImageGenerationTool(body []byte, baseModel string, auth *cliproxyauth
 	}
 	body, _ = sjson.SetRawBytes(body, "tools.-1", imageGenToolJSON)
 	return body
+}
+
+func stripImageGenerationTool(body []byte) []byte {
+	if gjson.GetBytes(body, "tool_choice.type").String() == "image_generation" {
+		body, _ = sjson.DeleteBytes(body, "tool_choice")
+	}
+	tools := gjson.GetBytes(body, "tools")
+	if !tools.Exists() || !tools.IsArray() {
+		return body
+	}
+	for {
+		removed := false
+		for index, t := range tools.Array() {
+			if t.Get("type").String() == "image_generation" {
+				body, _ = sjson.DeleteBytes(body, "tools."+strconv.Itoa(index))
+				removed = true
+				break
+			}
+		}
+		if !removed {
+			return body
+		}
+		tools = gjson.GetBytes(body, "tools")
+	}
 }
 
 func publishCodexImageToolUsage(ctx context.Context, reporter *helps.UsageReporter, body []byte, completedData []byte) {
